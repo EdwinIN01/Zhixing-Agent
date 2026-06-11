@@ -28,6 +28,7 @@ chroma_db/
 .idea/
 .vscode/
 *.swp
+.history/
 *.swo
 *~
 
