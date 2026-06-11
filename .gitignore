@@ -1,0 +1,46 @@
+# ===== 环境变量 - 绝不应该上传！=====
+.env
+.env.local
+.env.*.local
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.venv/
+venv/
+ENV/
+
+# ===== 数据库 / 向量库 =====
+*.chroma/
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 日志 =====
+*.log
+logs/
+
+# ===== 旧前端依赖（如有残留）=====
+node_modules/
+dist/
+.pnpm-store/

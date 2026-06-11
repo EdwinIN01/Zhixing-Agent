@@ -1,0 +1,8 @@
+image_prompt_path: "backend/prompts/IMAGE_ANALYSIS_PROMPT.txt"
+intent_prompt_path: "backend/prompts/INTENT_PROMPT.txt"
+eval_prompt_path: "backend/prompts/EVAL_PROMPT.txt"
+route_intro_prompt_path: "backend/prompts/ROUTE_INTRO_PROMPT.txt"
+multi_route_prompt_path: "backend/prompts/MULTI_ROUTE_PROMPT.txt"
+poi_selection_prompt_path: "backend/prompts/POI_SELECTION_PROMPT.txt"
+direct_reply_prompt_path: "backend/prompts/DIRECT_REPLY_PROMPT.txt"
+direct_reply_history_prompt_path: "backend/prompts/DIRECT_REPLY_HISTORY_PROMPT.txt"

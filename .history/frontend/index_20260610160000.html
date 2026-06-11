@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能路线规划助手</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* ===== 全局重置 ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      height: 100vh; overflow: hidden;
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.5); border-radius: 4px; }
+
+    .app-container {
+      display: flex; height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* ===== 侧边栏 ===== */
+    .sidebar {
+      width: 280px; min-width: 280px;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      padding: 20px; display: flex; flex-direction: column; z-index: 10;
+    }
+    .logo-section { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: white;
+    }
+    .logo-text {
+      font-size: 20px; font-weight: 700;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .new-chat-btn {
+      width: 100%; padding: 10px 18px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border: none; border-radius: 8px;
+      font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: opacity 0.2s; margin-bottom: 16px;
+    }
+    .new-chat-btn:hover { opacity: 0.9; }
+    .tips-label {
+      font-size: 12px; color: #909399;
+      padding: 6px 0 10px; border-top: 1px solid #eee;
+    }
+    .tip-card {
+      background: white; border: 1px solid #e4e7ed;
+      border-radius: 8px; padding: 10px 14px;
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: #303133;
+      transition: all 0.2s; margin-bottom: 8px;
+    }
+    .tip-card:hover {
+      transform: translateX(4px); border-color: #409eff;
+      box-shadow: 0 2px 8px rgba(64,158,255,0.15);
+    }
+    .tip-card .icon { font-size: 16px; }
+    .tip-card .label { color: #606266; }
+
+    /* ===== 主区域 ===== */
+    .main-content {
+      flex: 1; display: flex; flex-direction: column;
+      background: #f5f7fa; min-width: 0;
+    }
+    .chat-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 20px; background: white;
+      border-bottom: 1px solid #e4e7ed;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .header-left { display: flex; align-items: center; gap: 8px; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #67c23a; display: inline-block;
+    }
+    .header-title { font-size: 17px; font-weight: 600; color: #303133; }
+    .header-right { display: flex; gap: 6px; }
+    .btn-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid #e4e7ed; background: white;
+      cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover { border-color: #409eff; color: #409eff; }
+    .btn-icon.active { background: #409eff; color: white; border-color: #409eff; }
+
+    /* ===== 布局：地图 + 消息 ===== */
+    .chat-body {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      position: relative;
+    }
+    .map-panel {
+      flex-shrink: 0;
+      height: 0; overflow: hidden; transition: height 0.3s ease;
+      background: #e8eaed; position: relative;
+    }
+    .map-panel.visible { height: 380px; min-height: 200px; }
+    .map-container { width: 100%; height: 100%; min-height: 200px; }
+    .map-panel .resize-handle {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 6px;
+      cursor: ns-resize; background: transparent; z-index: 10;
+    }
+    .map-panel .resize-handle:hover { background: rgba(102,126,234,0.3); }
+    .map-panel .close-map {
+      position: absolute; top: 8px; right: 8px; z-index: 10;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: white; border: 1px solid #ddd;
+      cursor: pointer; font-size: 14px; line-height: 26px; text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .map-panel .close-map:hover { background: #f56c6c; color: white; }
+    .map-container { width: 100%; height: 100%; }
+    .map-legend {
+      position: absolute; bottom: 8px; left: 8px; z-index: 10;
+      background: white; border-radius: 6px; padding: 6px 10px;
+      font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      display: flex; gap: 12px;
+    }
+    .map-legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+    .legend-dot.origin { background: #409eff; }
+    .legend-dot.dest { background: #f56c6c; }
+    .legend-line {
+      width: 16px; height: 2px; display: inline-block;
+    }
+    .legend-line.r1 { background: #409eff; }
+    .legend-line.r2 { background: #67c23a; }
+    .legend-line.r3 { background: #e6a23c; }
+
+    .messages-panel {
+      flex: 1; overflow: hidden; background: #f5f7fa;
+    }
+    .messages-scroll {
+      height: 100%; overflow-y: auto; padding: 20px;
+    }
+
+    .welcome-message {
+      text-align: center; padding: 60px 20px;
+    }
+    .welcome-icon {
+      font-size: 64px; margin-bottom: 16px;
+      animation: bounce 2s ease-in-out infinite;
+    }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .welcome-message h2 { font-size: 24px; margin-bottom: 6px; color: #303133; }
+    .welcome-message p { color: #909399; font-size: 14px; }
+
+    /* ===== 消息气泡 ===== */
+    .message-item {
+      display: flex; gap: 10px; margin-bottom: 20px;
+      animation: slideIn 0.3s ease-out;
+    }
+    .message-item.user { flex-direction: row-reverse; }
+    .message-item.assistant { flex-direction: row; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .avatar.user { background: linear-gradient(135deg,#667eea,#764ba2); }
+    .avatar.assistant { background: linear-gradient(135deg,#409eff,#67c23a); }
+    .message-bubble { max-width: 72%; }
+    .message-content {
+      padding: 12px 16px; background: white;
+      border-radius: 14px; border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      line-height: 1.65; color: #303133; font-size: 14px;
+    }
+    .message-item.user .message-content {
+      background: linear-gradient(135deg,#667eea,#764ba2);
+      color: white; border-bottom-left-radius: 14px; border-bottom-right-radius: 4px;
+    }
+    .message-content p { margin: 5px 0; }
+    .message-content code {
+      background: rgba(0,0,0,0.08); padding: 2px 5px; border-radius: 4px; font-size: 0.9em;
+    }
+    .message-item.user .message-content code { background: rgba(255,255,255,0.2); }
+    .message-content ul, .message-content ol { padding-left: 18px; margin: 5px 0; }
+    .message-content li { margin: 2px 0; }
+    .message-time {
+      font-size: 11px; color: #909399; margin-top: 4px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .message-item.user .message-time { justify-content: flex-end; }
+
+    /* ===== 路线选择卡片 ===== */
+    .route-selection-card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .route-selection-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 14px 18px; border-bottom: 1px solid #eee;
+      font-weight: 600; color: #303133; font-size: 15px;
+    }
+    .route-list { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .route-card {
+      background: #fafafa; border: 1px solid #e4e7ed;
+      border-radius: 10px; padding: 12px 14px;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .route-card:hover { border-color: #409eff; transform: translateX(3px); }
+    .route-card.recommended { border-color: #67c23a; border-width: 2px; }
+    .route-card.selected { border-color: #409eff; background: #ecf5ff; }
+    .route-card .badge {
+      background: #67c23a; color: white;
+      font-size: 11px; padding: 2px 6px; border-radius: 8px; flex-shrink: 0;
+    }
+    .route-info { flex: 1; }
+    .route-summary { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 4px; }
+    .route-tags { display: flex; gap: 6px; }
+    .tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 8px;
+      background: #eef0f6; color: #606266;
+    }
+    .poi-card { flex: 1; }
+    .poi-name { font-size: 14px; font-weight: 600; color: #303133; }
+    .poi-addr { font-size: 12px; color: #909399; margin: 3px 0; }
+
+    /* ===== 加载动画 ===== */
+    .loading-message {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; color: #909399; font-size: 13px;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #e4e7ed; border-top-color: #409eff;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== 底部输入区 ===== */
+    .input-footer {
+      background: white; border-top: 1px solid #e4e7ed; padding: 10px 20px;
+    }
+    .image-preview {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 8px; position: relative;
+    }
+    .image-preview img {
+      width: 52px; height: 52px; object-fit: cover;
+      border-radius: 6px; border: 1px solid #e4e7ed;
+    }
+    .image-preview .remove-btn {
+      position: absolute; top: -4px; left: 40px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #f56c6c; color: white; border: none;
+      cursor: pointer; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .input-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    .input-row textarea {
+      flex: 1; padding: 8px 12px;
+      border: 1px solid #e4e7ed; border-radius: 8px;
+      font-size: 14px; font-family: inherit;
+      resize: none; outline: none; line-height: 1.4;
+      max-height: 100px; transition: border-color 0.2s;
+    }
+    .input-row textarea:focus { border-color: #409eff; }
+    .send-btn {
+      padding: 8px 20px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border: none; border-radius: 8px;
+      font-size: 14px; cursor: pointer;
+      transition: opacity 0.2s; white-space: nowrap;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .send-btn:hover { opacity: 0.9; }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .icon-btn {
+      padding: 8px 12px;
+      background: #fff;
+      color: #606266; border: 1px solid #dcdfe6; border-radius: 8px;
+      font-size: 13px; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .icon-btn:hover {
+      background: #ecf5ff; border-color: #409eff; color: #409eff;
+    }
+
+    /* ===== Markdown 表格 ===== */
+    .message-content table {
+      border-collapse: collapse; width: 100%; margin: 6px 0;
+    }
+    .message-content th, .message-content td {
+      border: 1px solid #e4e7ed; padding: 4px 8px; text-align: left;
+    }
+    .message-content th { background: #f5f7fa; font-weight: 600; }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .message-bubble { max-width: 90%; }
+      .map-panel.visible { height: 250px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="logo-section">
+        <div class="logo-icon">&#x1F5FA;</div>
+        <span class="logo-text">智能路线规划</span>
+      </div>
+      <button class="new-chat-btn" onclick="startNewChat()">
+        &#x271A; 新建对话
+      </button>
+      <div class="tips-label">&#x1F4A1; 快捷示例</div>
+      <div class="tip-card" onclick="sendQuickMessage('从北京到上海怎么走最快')">
+        <span class="icon">&#x1F697;</span>
+        <span class="label">北京 &#8594; 上海</span>
+      </div>
+      <div class="tip-card" onclick="sendQuickMessage('天安门附近有什么好餐厅')">
+        <span class="icon">&#x1F37D;</span>
+        <span class="label">搜索周边 POI</span>
+      </div>
+      <div class="tip-card" onclick="sendQuickMessage('推荐一条从成都到重庆的自驾游路线')">
+        <span class="icon">&#x1F4F8;</span>
+        <span class="label">自驾游路线</span>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main-content">
+      <header class="chat-header">
+        <div class="header-left">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="header-title">路线规划助手</span>
+        </div>
+        <div class="header-right">
+          <button class="btn-icon" id="mapToggleBtn" title="显示/隐藏地图" onclick="toggleMap()">&#x1F5FA;</button>
+          <button class="btn-icon" title="上传图片" onclick="document.getElementById('imageInput').click()">&#x1F5BC;</button>
+        </div>
+      </header>
+
+      <div class="chat-body">
+        <!-- 地图面板 -->
+        <div class="map-panel" id="mapPanel">
+          <div class="close-map" onclick="hideMap()">&#x2715;</div>
+          <div class="map-container" id="mapContainer"></div>
+          <div class="map-legend" id="mapLegend" style="display:none;">
+            <span><span class="legend-dot origin"></span> 起点</span>
+            <span><span class="legend-dot dest"></span> 终点</span>
+            <span><span class="legend-line r1"></span> 路线1</span>
+            <span><span class="legend-line r2"></span> 路线2</span>
+            <span><span class="legend-line r3"></span> 路线3</span>
+          </div>
+          <div class="resize-handle" id="resizeHandle"></div>
+        </div>
+
+        <!-- 消息面板 -->
+        <div class="messages-panel">
+          <div class="messages-scroll" id="messagesScroll">
+            <div id="welcomeMessage" class="welcome-message">
+              <div class="welcome-icon">&#x1F5FA;</div>
+              <h2>欢迎使用智能路线规划助手</h2>
+              <p>我可以帮您规划路线、搜索目的地、了解交通信息</p>
+            </div>
+            <div id="messageList"></div>
+            <div id="routeSelection" style="display:none;" class="route-selection-card">
+              <div class="route-selection-header" id="routeSelectionTitle">&#x1F50D; 请选择一条路线</div>
+              <div class="route-list" id="routeList"></div>
+            </div>
+            <div id="loadingIndicator" class="loading-message" style="display:none;">
+              <div class="spinner"></div>
+              <span>正在思考中...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部输入 -->
+      <footer class="input-footer">
+        <div class="image-preview" id="imagePreview" style="display:none;">
+          <img id="previewImg" src="" alt="预览" />
+          <button class="remove-btn" onclick="removeImage()">&#x2715;</button>
+        </div>
+        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)" />
+        <div class="input-row">
+          <button class="icon-btn" id="locBtn" onclick="getUserLocation()" title="获取当前位置">&#x1F4CD; 定位</button>
+          <textarea id="chatInput" rows="1" placeholder="输入您的问题..." onkeydown="handleKeyDown(event)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#x27A4; 发送</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- 高德地图 JS API（需配置有效 key 才加载） -->
+  <script type="text/javascript">
+    window.AMAP_JS_KEY = "";
+  </script>
+  <script type="text/javascript">
+    (function() {
+      var key = window.AMAP_JS_KEY || '';
+      if (!key) {
+        console.log('未配置高德地图 JS API Key，地图功能不可用');
+        return;
+      }
+      var script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = 'https://webapi.amap.com/maps?v=1.4.15&key=' + key;
+      script.onerror = function() { console.warn('地图 JS 加载失败，地图功能不可用'); };
+      document.head.appendChild(script);
+    })();
+  </script>
+
+  <script>
+    // ===== 状态 =====
+    var state = {
+      messages: [],
+      sessionId: null,
+      isLoading: false,
+      selectedImage: null,
+      routeSelection: null,
+      assistantMsgIndex: -1,
+      fullContent: '',
+      currentRoutes: null,
+      userLocation: null,
+      map: null,
+      mapPolylines: [],
+      mapMarkers: []
+    };
+
+    var $ = function(id) { return document.getElementById(id); };
+    var scrollToBottom = function() {
+      var el = $('messagesScroll');
+      setTimeout(function() { el.scrollTop = el.scrollHeight; }, 50);
+    };
+
+    function getTime() {
+      var d = new Date();
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+
+    function formatDist(m) {
+      if (!m) return '';
+      return m >= 1000 ? (m/1000).toFixed(1)+' 公里' : m+' 米';
+    }
+
+    function formatDur(s) {
+      if (!s) return '';
+      var min = Math.floor(s/60);
+      var h = Math.floor(min/60);
+      return h > 0 ? h+' 小时 '+(min%60)+' 分钟' : min+' 分钟';
+    }
+
+    // ===== 消息渲染 =====
+    function addMessage(role, content) {
+      state.messages.push({ role: role, content: marked.parse(content), time: getTime() });
+      renderMessages();
+      scrollToBottom();
+    }
+
+    function updateLastMessage(content) {
+      if (state.messages.length > 0) {
+        state.messages[state.messages.length - 1].content = marked.parse(content);
+        renderMessages();
+        scrollToBottom();
+      }
+    }
+
+    function renderMessages() {
+      var list = $('messageList');
+      list.innerHTML = state.messages.map(function(m) {
+        return '<div class="message-item ' + m.role + '">' +
+          '<div class="avatar ' + m.role + '">' + (m.role === 'user' ? '&#x1F464' : '&#x1F916') + '</div>' +
+          '<div class="message-bubble">' +
+            '<div class="message-content">' + m.content + '</div>' +
+            '<div class="message-time">&#x1F550; ' + m.time + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // ===== 新建对话 =====
+    function startNewChat() {
+      state.messages = [];
+      state.sessionId = null;
+      state.selectedImage = null;
+      state.routeSelection = null;
+      state.currentRoutes = null;
+      state.userLocation = null;
+      clearMap();
+      hideMap();
+      $('messageList').innerHTML = '';
+      $('welcomeMessage').style.display = 'block';
+      $('routeSelection').style.display = 'none';
+      $('chatInput').value = '';
+      removeImage();
+      clearHistory();
+    }
+
+    function sendQuickMessage(msg) {
+      $('chatInput').value = msg;
+      sendMessage();
+    }
+
+    // ===== 历史会话持久化 =====
+    var HISTORY_KEY = 'route_planner_history';
+
+    function saveHistory() {
+      try {
+        var data = {
+          messages: state.messages,
+          sessionId: state.sessionId,
+          currentRoutes: state.currentRoutes,
+          updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.warn('保存历史失败:', e);
+      }
+    }
+
+    function loadHistory() {
+      try {
+        var raw = localStorage.getItem(HISTORY_KEY);
+        if (!raw) return false;
+        var data = JSON.parse(raw);
+
+        // 恢复消息列表
+        if (data.messages && Array.isArray(data.messages)) {
+          state.messages = data.messages;
+          renderMessages();
+          $('welcomeMessage').style.display = 'none';
+          scrollToBottom();
+        }
+
+        // 恢复 sessionId
+        if (data.sessionId) {
+          state.sessionId = data.sessionId;
+        }
+
+        // 恢复地图路线
+        if (data.currentRoutes && Array.isArray(data.currentRoutes) && data.currentRoutes.length > 0) {
+          setTimeout(function() {
+            if (!state.map) showMap();
+            setTimeout(function() {
+              if (!state.map) initMap();
+              drawRoutesOnMap(data.currentRoutes);
+            }, 400);
+          }, 100);
+        }
+
+        return true;
+      } catch (e) {
+        console.warn('加载历史失败:', e);
+        return false;
+      }
+    }
+
+    function clearHistory() {
+      try {
+        localStorage.removeItem(HISTORY_KEY);
+      } catch (e) {
+        console.warn('清除历史失败:', e);
+      }
+    }
+
+    // ===== 图片上传 =====
+    function handleImageUpload(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        state.selectedImage = ev.target.result;
+        $('previewImg').src = ev.target.result;
+        $('imagePreview').style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeImage() {
+      state.selectedImage = null;
+      $('imagePreview').style.display = 'none';
+      $('imageInput').value = '';
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // ===== 浏览器定位 =====
+    function getUserLocation() {
+      if (!navigator.geolocation) {
+        addMessage('assistant', '你的浏览器不支持定位功能，你可以直接告诉我你所在的位置（如"从北京市朝阳区出发..."）');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          var lng = pos.coords.longitude;
+          var lat = pos.coords.latitude;
+          var coords = lng.toFixed(6) + ',' + lat.toFixed(6);
+          state.userLocation = coords;
+          var query = '我当前的位置坐标是 ' + coords + '（经度 ' + lng.toFixed(4) + '，纬度 ' + lat.toFixed(4) + '），请帮我以这里为出发点规划路线或查询周边信息';
+          addMessage('user', query);
+          sendMessage();
+        },
+        function(err) {
+          addMessage('assistant', '无法获取你的位置（' + err.message + '）。你可以直接告诉我你所在的位置（如"从北京市朝阳区出发..."）');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    }
+
+    // ===== 地图相关 =====
+    function toggleMap() {
+      var panel = $('mapPanel');
+      var btn = $('mapToggleBtn');
+      if (panel.classList.contains('visible')) {
+        hideMap();
+      } else {
+        showMap();
+      }
+    }
+
+    function showMap() {
+      var panel = $('mapPanel');
+      panel.classList.add('visible');
+      panel.style.height = '380px';
+      $('mapToggleBtn').classList.add('active');
+      setTimeout(function() {
+        if (!state.map) initMap();
+        else if (state.map && typeof state.map.setFitView === 'function') {
+          try { state.map.setFitView(); } catch (e) {}
+        }
+      }, 400);
+    }
+
+    function hideMap() {
+      $('mapPanel').classList.remove('visible');
+      $('mapPanel').style.height = '';
+      $('mapToggleBtn').classList.remove('active');
+    }
+
+    function initMap() {
+      if (!window.AMap) {
+        console.warn('AMap JS 尚未加载，稍后重试');
+        setTimeout(initMap, 500);
+        return;
+      }
+      var container = $('mapContainer');
+      if (!container || container.clientHeight < 50) {
+        console.warn('地图容器尺寸不足，稍后重试');
+        setTimeout(initMap, 500);
+        return;
+      }
+      try {
+        state.map = new AMap.Map(container, {
+          zoom: 11,
+          center: [116.397428, 39.90923],
+          resizeEnable: true
+        });
+        state.map.addControl(new AMap.Scale());
+        state.map.addControl(new AMap.ToolBar({ liteStyle: true }));
+        console.log('[地图] 初始化成功');
+      } catch (e) {
+        console.error('[地图] 初始化失败:', e);
+      }
+    }
+
+    function clearMap() {
+      if (state.mapPolylines && state.mapPolylines.length) {
+        try { state.map.remove(state.mapPolylines); } catch (e) {
+          state.mapPolylines.forEach(function(p) { try { p.setMap(null); } catch (err) {} });
+        }
+        state.mapPolylines = [];
+      }
+      if (state.mapMarkers && state.mapMarkers.length) {
+        try { state.map.remove(state.mapMarkers); } catch (e) {
+          state.mapMarkers.forEach(function(m) { try { m.setMap(null); } catch (err) {} });
+        }
+        state.mapMarkers = [];
+      }
+      state.currentRoutes = null;
+      $('mapLegend').style.display = 'none';
+    }
+
+    function parseCoord(s) {
+      if (!s || typeof s !== 'string') return null;
+      var parts = s.split(',');
+      if (parts.length < 2) return null;
+      var lng = parseFloat(parts[0]);
+      var lat = parseFloat(parts[1]);
+      if (isNaN(lng) || isNaN(lat)) return null;
+      return [lng, lat];
+    }
+
+    function parsePolyline(route) {
+      if (route.decoded_polyline && Array.isArray(route.decoded_polyline) && route.decoded_polyline.length >= 2) {
+        var first = route.decoded_polyline[0];
+        if (Array.isArray(first) && first.length >= 2 && typeof first[0] === 'number') {
+          return route.decoded_polyline;
+        }
+        // 兼容 [[lng, lat], ...] 但元素是字符串
+        if (Array.isArray(first) && first.length >= 2) {
+          try {
+            return route.decoded_polyline.map(function (pt) {
+              return [parseFloat(pt[0]), parseFloat(pt[1])];
+            });
+          } catch (e) {}
+        }
+      }
+      if (route.polyline && typeof route.polyline === 'string' && route.polyline.length > 10) {
+        var raw = route.polyline;
+        if (raw.indexOf(';') >= 0 && raw.indexOf(',') >= 0) {
+          var path = [];
+          var pairs = raw.split(';');
+          for (var k = 0; k < pairs.length; k++) {
+            if (!pairs[k]) continue;
+            var ps = pairs[k].split(',');
+            if (ps.length >= 2) {
+              var lng = parseFloat(ps[0]);
+              var lat = parseFloat(ps[1]);
+              if (!isNaN(lng) && !isNaN(lat)) path.push([lng, lat]);
+            }
+          }
+          if (path.length >= 2) return path;
+        }
+      }
+      return null;
+    }
+
+    function drawRoutesOnMap(routes) {
+      if (!routes || !Array.isArray(routes)) return;
+      console.log('[地图] 绘制 ' + routes.length + ' 条路线');
+
+      if (!window.AMap) {
+        console.log('[地图] 等待 AMap JS 加载...');
+        showMap();
+        setTimeout(function() { if (window.AMap) drawRoutesOnMap(routes); }, 800);
+        return;
+      }
+
+      showMap();
+
+      if (!state.map) {
+        setTimeout(function() {
+          if (!state.map) initMap();
+          setTimeout(function() { if (state.map) drawRoutesOnMap(routes); }, 300);
+        }, 300);
+        return;
+      }
+
+      clearMap();
+      state.currentRoutes = routes;
+      $('mapLegend').style.display = 'flex';
+
+      var colors = ['#409eff', '#67c23a', '#e6a23c'];
+      var allPoints = [];
+      var originCoord = null, destCoord = null;
+      var routeCount = 0;
+
+      for (var idx = 0; idx < routes.length; idx++) {
+        var route = routes[idx];
+        if (!route || route.type !== 'route') continue;
+
+        if (!originCoord) originCoord = parseCoord(route.origin_coord);
+        if (!destCoord) destCoord = parseCoord(route.dest_coord);
+
+        var path = parsePolyline(route);
+        if (!path || path.length < 2) {
+          console.warn('[地图] 路线 ' + idx + ' 无有效 polyline');
+          continue;
+        }
+
+        try {
+          var color = colors[routeCount % colors.length];
+          var poly = new AMap.Polyline({
+            path: path,
+            strokeColor: color,
+            strokeWeight: 7,
+            strokeOpacity: 0.9,
+            lineJoin: 'round',
+            showDir: true,
+            zIndex: 100 - routeCount
+          });
+          poly.setMap(state.map);
+          state.mapPolylines.push(poly);
+          allPoints = allPoints.concat(path);
+          routeCount++;
+        } catch (e) {
+          console.error('[地图] 绘制路线 ' + idx + ' 失败:', e);
+        }
+      }
+
+      if (originCoord) {
+        var om = new AMap.Marker({
+          position: originCoord,
+          content: '<div style="background:#409eff;color:#fff;padding:4px 10px;border-radius:12px;font-size:13px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.3);">起点</div>',
+          offset: new AMap.Pixel(-30, -12),
+          zIndex: 200
+        });
+        om.setMap(state.map);
+        state.mapMarkers.push(om);
+      }
+      if (destCoord) {
+        var dm = new AMap.Marker({
+          position: destCoord,
+          content: '<div style="background:#f56c6c;color:#fff;padding:4px 10px;border-radius:12px;font-size:13px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.3);">终点</div>',
+          offset: new AMap.Pixel(-30, -12),
+          zIndex: 200
+        });
+        dm.setMap(state.map);
+        state.mapMarkers.push(dm);
+      }
+
+      if (allPoints.length > 0) {
+        try { state.map.setFitView(null, false, [60, 60, 60, 60]); }
+        catch (e) { console.error('[地图] setFitView 失败:', e); }
+      } else if (originCoord && destCoord) {
+        try { state.map.setFitView(state.mapMarkers, false, [60, 60, 60, 60]); }
+        catch (e) {
+          try {
+            var bounds = new AMap.Bounds(
+              [Math.min(originCoord[0], destCoord[0]), Math.min(originCoord[1], destCoord[1])],
+              [Math.max(originCoord[0], destCoord[0]), Math.max(originCoord[1], destCoord[1])]
+            );
+            state.map.setBounds(bounds);
+          } catch (e2) {}
+        }
+      }
+      console.log('[地图] 绘制完成，路线: ' + routeCount + '，总坐标点: ' + allPoints.length);
+    }
+
+    // ===== 路线选择卡片 =====
+    function renderRouteSelection(data) {
+      var container = $('routeSelection');
+      var list = $('routeList');
+      var title = $('routeSelectionTitle');
+      title.innerHTML = '&#x1F50D; ' + (data.message || '请选择一条路线');
+
+      list.innerHTML = data.routes.map(function(r, i) {
+        if (r.type === 'route') {
+          return '<div class="route-card' + (r.id === data.recommended_id ? ' recommended' : '') + '" ' +
+            'onclick="selectRoute(\'' + r.id + '\')" ' +
+            'onmouseenter="highlightRoute(' + i + ')" onmouseleave="unhighlightRoutes()">' +
+            '<div class="route-info">' +
+              '<div class="route-summary">' + (r.summary || '路线') + '</div>' +
+              '<div class="route-tags">' +
+                '<span class="tag">&#x1F697; ' + formatDist(r.distance) + '</span>' +
+                '<span class="tag">&#x23F1; ' + formatDur(r.duration) + '</span>' +
+              '</div>' +
+            '</div>' +
+            (r.id === data.recommended_id ? '<span class="badge">推荐</span>' : '') +
+          '</div>';
+        }
+        return '<div class="route-card" onclick="selectRoute(\'' + r.id + '\')">' +
+          '<span style="font-size:26px;">&#x1F4CD;</span>' +
+          '<div class="poi-card">' +
+            '<div class="poi-name">' + (r.name || '') + '</div>' +
+            '<div class="poi-addr">' + (r.address || '') + '</div>' +
+            '<div class="route-tags">' +
+              (r.distance ? '<span class="tag">&#x1F4CF; ' + formatDist(r.distance) + '</span>' : '') +
+              (r.rating ? '<span class="tag">&#x2B50; ' + r.rating + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      container.style.display = 'block';
+      // 同步绘制地图
+      if (data.routes && data.routes.length > 0 && data.routes[0].type === 'route') {
+        drawRoutesOnMap(data.routes);
+      }
+      setTimeout(scrollToBottom, 50);
+    }
+
+    function highlightRoute(idx) {
+      if (!state.mapPolylines || !state.mapPolylines.length) return;
+      state.mapPolylines.forEach(function(p, i) {
+        try { p.setOptions({ strokeWeight: i === idx ? 10 : 5, strokeOpacity: i === idx ? 1 : 0.5 }); }
+        catch (e) {}
+      });
+      var cards = document.querySelectorAll('#routeList .route-card');
+      cards.forEach(function(c, i) { c.classList.toggle('selected', i === idx); });
+    }
+
+    function unhighlightRoutes() {
+      if (!state.mapPolylines || !state.mapPolylines.length) return;
+      state.mapPolylines.forEach(function(p) {
+        try { p.setOptions({ strokeWeight: 7, strokeOpacity: 0.9 }); }
+        catch (e) {}
+      });
+      var cards = document.querySelectorAll('#routeList .route-card');
+      cards.forEach(function(c) { c.classList.remove('selected'); });
+    }
+
+    // ===== 选择路线 =====
+    async function selectRoute(routeId) {
+      if (!state.sessionId) return;
+      state.isLoading = true;
+      $('loadingIndicator').style.display = 'flex';
+      $('routeSelection').style.display = 'none';
+
+      try {
+        var res = await fetch('/api/select-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: state.sessionId, selected_route_id: routeId })
+        });
+        var data = await res.json();
+        if (data.response) addMessage('assistant', data.response);
+        saveHistory();
+      } catch (err) {
+        addMessage('assistant', '选择路线时出错: ' + err.message);
+      } finally {
+        state.isLoading = false;
+        $('loadingIndicator').style.display = 'none';
+      }
+    }
+
+    // ===== 发送消息 =====
+    async function sendMessage() {
+      var input = $('chatInput');
+      var query = input.value.trim();
+      if (!query && !state.selectedImage) return;
+
+      var imageBase64 = state.selectedImage ? state.selectedImage.split(',')[1] : null;
+
+      addMessage('user', query || '[图片]');
+      $('welcomeMessage').style.display = 'none';
+      input.value = '';
+      removeImage();
+
+      state.isLoading = true;
+      state.routeSelection = null;
+      state.assistantMsgIndex = -1;
+      state.fullContent = '';
+      $('routeSelection').style.display = 'none';
+      $('loadingIndicator').style.display = 'flex';
+      $('sendBtn').disabled = true;
+
+      try {
+        var res = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_query: query, image_base64: imageBase64, session_id: state.sessionId })
+        });
+
+        if (!res.ok) throw new Error('请求失败(' + res.status + ')');
+
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder('utf-8');
+        var buffer = '';
+
+        while (true) {
+          var result = await reader.read();
+          if (result.done) break;
+
+          buffer += decoder.decode(result.value, { stream: true });
+
+          while (buffer.includes('\n\n')) {
+            var idx = buffer.indexOf('\n\n');
+            var event = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 2);
+
+            if (event.indexOf('data: ') !== 0) continue;
+
+            try {
+              var data = JSON.parse(event.slice(6));
+
+              if (data.type === 'stream') {
+                state.fullContent += data.content;
+                if (state.assistantMsgIndex === -1) {
+                  state.messages.push({ role: 'assistant', content: marked.parse(state.fullContent), time: getTime() });
+                  state.assistantMsgIndex = state.messages.length - 1;
+                } else {
+                  updateLastMessage(state.fullContent);
+                }
+              } else if (data.type === 'end') {
+                if (data.session_id) state.sessionId = data.session_id;
+                // 有路线数据则绘制地图
+                if (data.routes && data.routes.length > 0 && data.routes[0].type === 'route') {
+                  drawRoutesOnMap(data.routes);
+                }
+                saveHistory();
+                state.isLoading = false;
+              } else if (data.type === 'pending_selection') {
+                if (data.session_id) state.sessionId = data.session_id;
+                state.routeSelection = data.data;
+                addMessage('assistant', data.message);
+                renderRouteSelection(data.data);
+                saveHistory();
+                state.isLoading = false;
+              } else if (data.type === 'error') {
+                addMessage('assistant', data.content);
+                state.isLoading = false;
+              }
+            } catch (e) {
+              console.error('解析失败:', e);
+            }
+          }
+        }
+      } catch (err) {
+        addMessage('assistant', '抱歉，发生了错误: ' + err.message);
+      } finally {
+        state.isLoading = false;
+        $('loadingIndicator').style.display = 'none';
+        $('sendBtn').disabled = false;
+      }
+    }
+
+    // ===== 地图拖拽调整大小 =====
+    (function() {
+      var handle = $('resizeHandle');
+      var panel = $('mapPanel');
+      var isResizing = false;
+      var startY, startHeight;
+
+      handle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = panel.offsetHeight;
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        var newHeight = startHeight + (e.clientY - startY);
+        if (newHeight >= 150 && newHeight <= 600) {
+          panel.style.height = newHeight + 'px';
+        }
+      });
+
+      document.addEventListener('mouseup', function() {
+        if (isResizing) {
+          isResizing = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          if (state.map) state.map.setFitView();
+        }
+      });
+    })();
+
+    // ===== 页面加载时恢复历史会话 =====
+    (function() {
+      loadHistory();
+    })();
+  </script>
+</body>
+</html>
